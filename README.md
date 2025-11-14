@@ -5,6 +5,7 @@
 ### 功能更新和bug修复
 
 - 在主菜单添加了更新人脸功能
+- 新增了查询总里程功能
 - 修复了修复了tsnRunServer.py中getFaceImage方法对API响应的错误处理
 
 ## 功能特性
