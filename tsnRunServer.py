@@ -178,11 +178,12 @@ class TsnRunServer:
         logger.info("本地没有人脸图片，从服务器获取...")
 
         face_list_resp = await self.tsnClient.listBasUserImageFace()
+        logger.info(f"API返回数据: {face_list_resp}")
 
-        if not face_list_resp or 'data' not in face_list_resp:
+        if not face_list_resp:
             raise TiShiNengError("获取人脸列表失败，请检查网络连接或账号状态", 20001)
 
-        face_data = face_list_resp['data']
+        face_data = face_list_resp
         if not face_data or len(face_data) == 0:
             raise TiShiNengError("该账号没有人脸图片记录，请先在APP中上传人脸照片", 20002)
 

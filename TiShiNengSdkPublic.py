@@ -249,16 +249,19 @@ class TiShiNengSdkPublic:
             headers['sign'] = sign
             headers['Authorization'] = 'Bearer ' + self.token
             headers['timestamp'] = timestamp
+            logger.info(f"API请求: {url}, 参数: {params}")
             resp = await self.httpClient.get(url=url, params=params, headers=headers)
+            logger.info(f"API响应状态码: {resp.status_code}")
             if resp.status_code == 200:
-                resp = resp.json()
-                if resp['code'] == 0:
-                    return resp['data']
-                raise TiShiNengError(resp['msg'])
+                resp_json = resp.json()
+                logger.info(f"API响应内容: {resp_json}")
+                if resp_json['code'] == 0:
+                    return resp_json['data']
+                raise TiShiNengError(resp_json['msg'])
             else:
-                resp = resp.json()
-                logger.error(resp)
-                raise TiShiNengError(resp['msg'], resp['code'])
+                resp_json = resp.json()
+                logger.error(resp_json)
+                raise TiShiNengError(resp_json['msg'], resp_json['code'])
         except TiShiNengError as e:
             raise e
 

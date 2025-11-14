@@ -16,7 +16,7 @@ from TiShiNengSdkPrivate import TiShiNengPrivate
 from database import get_db, init_db
 from models import TsnAccount_Model
 from services.tsnSchool.tsnSchoolDao import getSchoolListDao, addOrUpdateSchool
-from tsnClient import tsnPasswordAuthServer
+from tsnClient import tsnPasswordAuthServer, getTsnClientById
 from tsnRunServer import TsnRunServer, TsnRunType
 from spiderServer import startSpider
 
@@ -55,6 +55,8 @@ class TsnCliManager:
         print("2. 授权账号")
         print("3. 开始跑步")
         print("4. 爬取路径数据")
+        print("5. 更新人脸图片")
+        print("6. 查询跑步里程")
         print("0. 退出系统")
         print("=" * 60)
 
@@ -330,6 +332,93 @@ class TsnCliManager:
             logger.exception(e)
             print(f"❌ 操作失败: {str(e)}")
 
+    async def update_face_images(self):
+        """Update face images for an account"""
+        self.print_header("更新人脸图片")
+
+        try:
+            async for db in get_db():
+                # 1. Select account
+                stmt = select(TsnAccount_Model).options(
+                    selectinload(TsnAccount_Model.school)
+                )
+                result = await db.execute(stmt)
+                accounts = result.scalars().all()
+
+                if not accounts:
+                    print("❌ 没有可用的账号，请先授权账号")
+                    return
+
+                print("\n请选择要更新人脸图片的账号:")
+                print("-" * 60)
+                for idx, account in enumerate(accounts, 1):
+                    school_name = account.school.school_name if account.school else "未知学校"
+                    print(f"{idx}. {account.username} - {school_name}")
+                print("-" * 60)
+
+                # Get account selection
+                try:
+                    choice = input("\n请输入账号编号 (0=取消): ").strip()
+                    if choice == '0':
+                        return
+
+                    account_idx = int(choice) - 1
+                    if account_idx < 0 or account_idx >= len(accounts):
+                        print("❌ 无效的账号编号")
+                        return
+
+                    selected_account = accounts[account_idx]
+                    school_name = selected_account.school.school_name if selected_account.school else "未知学校"
+                    print(f"\n已选择账号: {selected_account.username} - {school_name}")
+
+                except ValueError:
+                    print("❌ 请输入有效的数字")
+                    return
+
+                # 2. Confirm and start updating face images
+                print("\n" + "=" * 60)
+                print("更新人脸图片任务信息:")
+                print(f"  账号: {selected_account.username}")
+                print(f"  学校: {school_name}")
+                print(f"  说明: 将从服务器下载最新的人脸图片并保存到本地")
+                print("=" * 60)
+
+                confirm = input("\n确认开始更新? (y/n): ").strip().lower()
+                if confirm != 'y':
+                    print("已取消")
+                    return
+
+                # 3. Execute face image update
+                print("\n开始更新人脸图片...")
+                try:
+                    # Initialize TsnRunServer with dummy values since we only need the face functionality
+                    run_server = TsnRunServer(
+                        accountId=selected_account.id,
+                        runKiloMeter=2.0,  # Dummy value
+                        logRunType=TsnRunType.freedom  # Dummy value
+                    )
+                    
+                    # Load account info
+                    run_server.accountModel = selected_account
+                    run_server.tsnClient = await getTsnClientById(selected_account.id, db)
+                    run_server.isPublic = run_server.tsnClient.isPublic()
+
+                    # Update face images
+                    face_image_data = await run_server.getFaceImage()
+                    
+                    if face_image_data:
+                        print("\n✅ 人脸图片更新完成！")
+                    else:
+                        print("\n⚠️ 未获取到人脸图片，请检查账号设置")
+
+                except Exception as e:
+                    logger.exception(e)
+                    print(f"\n❌ 更新失败: {str(e)}")
+
+        except Exception as e:
+            logger.exception(e)
+            print(f"❌ 操作失败: {str(e)}")
+
     async def crawl_paths(self):
         """Crawl running paths from account"""
         self.print_header("爬取路径数据")
@@ -403,6 +492,182 @@ class TsnCliManager:
             logger.exception(e)
             print(f"❌ 操作失败: {str(e)}")
 
+    async def query_running_distance(self):
+        """Query running distance for an account"""
+        self.print_header("查询跑步里程")
+
+        try:
+            async for db in get_db():
+                # 1. Select account
+                stmt = select(TsnAccount_Model).options(
+                    selectinload(TsnAccount_Model.school)
+                )
+                result = await db.execute(stmt)
+                accounts = result.scalars().all()
+
+                if not accounts:
+                    print("❌ 没有可用的账号，请先授权账号")
+                    return
+
+                print("\n请选择要查询的账号:")
+                print("-" * 60)
+                for idx, account in enumerate(accounts, 1):
+                    school_name = account.school.school_name if account.school else "未知学校"
+                    sys_type = "公版" if account.school and account.school.sys_type == 2 else "私版"
+                    print(f"{idx}. {account.username} - {school_name} ({sys_type})")
+                print("-" * 60)
+
+                # Get account selection
+                try:
+                    choice = input("\n请输入账号编号 (0=取消): ").strip()
+                    if choice == '0':
+                        return
+
+                    account_idx = int(choice) - 1
+                    if account_idx < 0 or account_idx >= len(accounts):
+                        print("❌ 无效的账号编号")
+                        return
+
+                    selected_account = accounts[account_idx]
+                    school_name = selected_account.school.school_name if selected_account.school else "未知学校"
+                    sys_type = "公版" if selected_account.school and selected_account.school.sys_type == 2 else "私版"
+                    print(f"\n已选择账号: {selected_account.username} - {school_name} ({sys_type})")
+
+                except ValueError:
+                    print("❌ 请输入有效的数字")
+                    return
+
+                # 2. Query running distance based on account type
+                print("\n正在查询跑步里程...")
+                try:
+                    # Get TsnClient instance
+                    tsn_client = await getTsnClientById(selected_account.id, db)
+                    
+                    total_distance = 0.0
+                    record_count = 0
+                    
+                    if tsn_client.isPublic():
+                        # Public version (公版)
+                        # Get summary
+                        try:
+                            summary = await tsn_client.sumExerciseRecord()
+                            if summary and 'sportRange' in summary:
+                                total_distance = float(summary['sportRange'])
+                                record_count = int(summary.get('sportTimes', 0))
+                        except Exception as e:
+                            logger.exception(e)
+                            print(f"⚠️ 获取公版汇总数据失败: {str(e)}")
+                            
+                        # Get detailed records
+                        if total_distance == 0.0:
+                            try:
+                                page = 1
+                                last_record_ids = set()  # Track record IDs to prevent duplicates
+                                while True:
+                                    records = await tsn_client.listExerciseRecord(runStatus=1, datePageIndex=page)
+                                    if not records or 'records' not in records:
+                                        break
+                                        
+                                    record_list = records['records']
+                                    if not record_list:
+                                        break
+                                        
+                                    # Check for duplicate records
+                                    current_record_ids = set()
+                                    has_new_records = False
+                                    for record in record_list:
+                                        record_id = record.get('id', '')
+                                        current_record_ids.add(record_id)
+                                        if record_id not in last_record_ids:
+                                            has_new_records = True
+                                            if 'sportRange' in record:
+                                                total_distance += float(record['sportRange'])
+                                        
+                                    # If no new records, break the loop
+                                    if not has_new_records:
+                                        break
+                                        
+                                    record_count += len(record_list)
+                                    last_record_ids.update(current_record_ids)
+                                    page += 1
+                                    
+                                    # Limit pages to prevent infinite loop
+                                    if page > 50:  # Max 50 pages
+                                        break
+                            except Exception as e:
+                                logger.exception(e)
+                                print(f"⚠️ 获取公版详细数据失败: {str(e)}")
+                    else:
+                        # Private version (私版)
+                        # Get summary
+                        try:
+                            summary = await tsn_client.sumSportRecord()
+                            if summary and 'sportRange' in summary:
+                                total_distance = float(summary['sportRange'])
+                                record_count = int(summary.get('sportTimes', 0))
+                        except Exception as e:
+                            logger.exception(e)
+                            print(f"⚠️ 获取私版汇总数据失败: {str(e)}")
+                            
+                        # Get detailed records
+                        if total_distance == 0.0:
+                            try:
+                                page = 1
+                                last_record_ids = set()  # Track record IDs to prevent duplicates
+                                while True:
+                                    records = await tsn_client.appSportRecordList(sportType=2, pageIndex=page, pageSize=10)
+                                    if not records or 'records' not in records:
+                                        break
+                                        
+                                    record_list = records['records']
+                                    if not record_list:
+                                        break
+                                        
+                                    # Check for duplicate records
+                                    current_record_ids = set()
+                                    has_new_records = False
+                                    for record in record_list:
+                                        record_id = record.get('id', '')
+                                        current_record_ids.add(record_id)
+                                        if record_id not in last_record_ids:
+                                            has_new_records = True
+                                            if 'sportRange' in record:
+                                                total_distance += float(record['sportRange'])
+                                        
+                                    # If no new records, break the loop
+                                    if not has_new_records:
+                                        break
+                                        
+                                    record_count += len(record_list)
+                                    last_record_ids.update(current_record_ids)
+                                    page += 1
+                                    
+                                    # Limit pages to prevent infinite loop
+                                    if page > 50:  # Max 50 pages
+                                        break
+                            except Exception as e:
+                                logger.exception(e)
+                                print(f"⚠️ 获取私版详细数据失败: {str(e)}")
+
+                    # Display results
+                    print("\n" + "=" * 60)
+                    print("跑步里程查询结果:")
+                    print(f"  账号: {selected_account.username}")
+                    print(f"  学校: {school_name}")
+                    print(f"  类型: {sys_type}")
+                    print(f"  总里程: {total_distance:.2f} 公里")
+                    print(f"  记录数: {record_count} 条")
+                    print("=" * 60)
+                    print("\n✅ 查询完成！")
+
+                except Exception as e:
+                    logger.exception(e)
+                    print(f"\n❌ 查询失败: {str(e)}")
+
+        except Exception as e:
+            logger.exception(e)
+            print(f"❌ 操作失败: {str(e)}")
+
     async def run(self):
         """Run main program"""
         # Initialize database
@@ -413,7 +678,7 @@ class TsnCliManager:
         while self.running:
             self.print_menu()
 
-            choice = input("\n请选择操作 (0-4): ").strip()
+            choice = input("\n请选择操作 (0-6): ").strip()
 
             if choice == '1':
                 await self.update_school_list()
@@ -423,6 +688,10 @@ class TsnCliManager:
                 await self.start_running()
             elif choice == '4':
                 await self.crawl_paths()
+            elif choice == '5':
+                await self.update_face_images()
+            elif choice == '6':
+                await self.query_running_distance()
             elif choice == '0':
                 print("\n感谢使用，再见!")
                 self.running = False
