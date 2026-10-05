@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# 本地数据库（含账号、Token 等敏感数据）
+*.db
+*.sqlite
+*.sqlite3
+
+# 人脸图片
+face_images/
+
+# 日志与环境变量
+*.log
+.env
+.env.*
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
