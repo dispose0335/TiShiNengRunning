@@ -161,7 +161,7 @@ class TiShiNengSdkPublic:
         token = self.schoolCode + ':pig'
         base64Token = base64.b64encode(token.encode('utf-8')).decode('utf-8')
         headers['Authorization'] = 'Basic ' + base64Token
-        url = self.cloudUrl + '/' + tsn_routes.route('oauthToken')
+        url = tsn_routes.join_url(self.cloudUrl, tsn_routes.route('oauthToken'))
         resp = await self.httpClient.post(url, params=params, headers=headers)
         return resp.json()
 
@@ -171,12 +171,12 @@ class TiShiNengSdkPublic:
         token = self.schoolCode + ':pig'
         base64Token = base64.b64encode(token.encode('utf-8')).decode('utf-8')
         headers['Authorization'] = 'Basic ' + base64Token
-        url = self.cloudUrl + '/' + tsn_routes.route('oauthToken')
+        url = tsn_routes.join_url(self.cloudUrl, tsn_routes.route('oauthToken'))
         resp = await self.httpClient.post(url, params=params, headers=headers)
         return resp.json()
 
     async def httpPost(self, url, data, timestamp):
-        url = self.cloudUrl + url
+        url = tsn_routes.join_url(self.cloudUrl, url)
         try:
             sign = self.getSign(data.copy(), timestamp)
             headers = self.headers.copy()
@@ -203,7 +203,7 @@ class TiShiNengSdkPublic:
             raise e
 
     async def httpGet(self, url, params, timestamp=None):
-        url = self.cloudUrl + url
+        url = tsn_routes.join_url(self.cloudUrl, url)
         try:
             if timestamp is None:
                 timestamp = str(int(time.time() * 1000))
@@ -388,7 +388,7 @@ class TiShiNengSdkPublic:
         return tsn_environment.build_environment_payload(device_id=self.deviceId, signals=self._envSignals, abis=self.a_list)
 
     async def exerciseRunningFace(self, faceBytes: bytes, coordinates, identify, runType=1, faceType=1):
-        url = self.cloudUrl + '/' + tsn_routes.route('exerciseRunningFace')
+        url = tsn_routes.join_url(self.cloudUrl, tsn_routes.route('exerciseRunningFace'))
         timestamp = str(int(time.time() * 1000))
         data = {'identify': identify, 'type': str(faceType), 'runType': str(runType), 'coordinates': coordinates, 'timeStamp': timestamp, 'exception': '0', 'environment': self.getEnvData()}
         params = self.v2BaseDict.copy()

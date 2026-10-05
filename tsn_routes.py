@@ -29,10 +29,12 @@ def normalize_base_url(url: Optional[str]) -> str:
     return candidate + '/'
 
 def build_url(base_url: str, name_or_token: str) -> str:
-    target = route(name_or_token)
-    if is_absolute(target):
-        return target
-    return normalize_base_url(base_url) + target
+    return join_url(base_url, route(name_or_token))
+
+def join_url(base_url: str, path: str) -> str:
+    if is_absolute(path):
+        return path
+    return normalize_base_url(base_url).rstrip('/') + '/' + path.lstrip('/')
 
 def all_routes() -> Dict[str, str]:
     return {name: ROUTE_BY_TOKEN[token] for name, token in ROUTE_NAMES.items()}
