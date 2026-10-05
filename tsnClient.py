@@ -30,10 +30,12 @@ async def getPublicVersionClient(accountModel: TsnAccount_Model):
     try:
         freshTokenResp = await tsn.freshToken(fresh_token)
         logger.info(freshTokenResp)
-        if 'msg' not in freshTokenResp:
-            async for newDb in get_db():
-                await updateAccessToken(accountModel.id, newDb, freshTokenResp['access_token'], freshTokenResp['refresh_token'], freshTokenResp['expires_in'])
-            tsn.setToken(freshTokenResp['access_token'])
+        if 'msg' in freshTokenResp:
+            # freshToken 对 401 也只返回响应体、不抛异常，主动抛出以触发下面的重登兜底
+            raise TiShiNengError(freshTokenResp['msg'], 401)
+        async for newDb in get_db():
+            await updateAccessToken(accountModel.id, newDb, freshTokenResp['access_token'], freshTokenResp['refresh_token'], freshTokenResp['expires_in'])
+        tsn.setToken(freshTokenResp['access_token'])
     except TiShiNengError as e:
         if e.code == 401:
             logger.info('token失效，重新获取')
