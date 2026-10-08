@@ -176,7 +176,7 @@ class TiShiNengSdkPublic:
         return resp.json()
 
     async def httpPost(self, url, data, timestamp):
-        url = self.cloudUrl + url
+        url = self.cloudUrl + '/' + url.lstrip('/')
         try:
             sign = self.getSign(data.copy(), timestamp)
             headers = self.headers.copy()
@@ -203,7 +203,7 @@ class TiShiNengSdkPublic:
             raise e
 
     async def httpGet(self, url, params, timestamp=None):
-        url = self.cloudUrl + url
+        url = self.cloudUrl + '/' + url.lstrip('/')
         try:
             if timestamp is None:
                 timestamp = str(int(time.time() * 1000))
