@@ -27,26 +27,29 @@ async def getPublicVersionClient(accountModel: TsnAccount_Model):
     tsn = TiShiNengSdkPublic(uid, schoolId, schoolCode, openId, deviceId, brandName, deviceNum, osVersion, access_token, a_list)
     if lan_url != '' and lan_url is not None:
         tsn.setCloudUrl(lan_url)
+    refreshed = False
     try:
         freshTokenResp = await tsn.freshToken(fresh_token)
         logger.info(freshTokenResp)
-        if 'msg' not in freshTokenResp:
+        if isinstance(freshTokenResp, dict) and freshTokenResp.get('access_token'):
             async for newDb in get_db():
                 await updateAccessToken(accountModel.id, newDb, freshTokenResp['access_token'], freshTokenResp['refresh_token'], freshTokenResp['expires_in'])
             tsn.setToken(freshTokenResp['access_token'])
+            refreshed = True
     except TiShiNengError as e:
-        if e.code == 401:
-            logger.info('token失效，重新获取')
-            tokenResp = await tsn.getAccessToken(username, password)
-            logger.info(tokenResp)
-            if 'msg' not in tokenResp:
-                async for newDb in get_db():
-                    await updateAccessToken(accountModel.id, newDb, tokenResp['access_token'], tokenResp['refresh_token'], tokenResp['expires_in'])
-                tsn.setToken(tokenResp['access_token'])
-            else:
-                raise TiShiNengError(tokenResp['msg'], 10001)
-        else:
+        if e.code != 401:
             raise e
+    if not refreshed:
+        logger.info('refresh_token 失效，重新登录获取')
+        tokenResp = await tsn.getAccessToken(username, password)
+        logger.info(tokenResp)
+        if isinstance(tokenResp, dict) and tokenResp.get('access_token'):
+            async for newDb in get_db():
+                await updateAccessToken(accountModel.id, newDb, tokenResp['access_token'], tokenResp['refresh_token'], tokenResp['expires_in'])
+            tsn.setToken(tokenResp['access_token'])
+        else:
+            msg = tokenResp.get('msg') if isinstance(tokenResp, dict) else str(tokenResp)
+            raise TiShiNengError(msg or '重新登录失败', 10001)
     return tsn
 
 async def getPrivateVersionClient(accountModel: TsnAccount_Model):
