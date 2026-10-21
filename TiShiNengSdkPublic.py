@@ -101,6 +101,15 @@ class TiShiNengSdkPublic:
     def getMd5(text):
         return hashlib.md5(text.encode('utf-8')).hexdigest()
 
+    @staticmethod
+    def jsonOrRaise(resp):
+        """网关/WAF 拦截时返回的是 HTML，直接 resp.json() 只会抛出难懂的 JSONDecodeError。"""
+        try:
+            return resp.json()
+        except ValueError:
+            snippet = (resp.text or '').strip().replace('\n', ' ')[:200]
+            raise TiShiNengError(f'接口返回非 JSON（HTTP {resp.status_code}，可能被网关/WAF 拦截）: {snippet}', 10002)
+
     def setCloudUrl(self, cloudUrl):
         if not cloudUrl:
             return
@@ -186,7 +195,7 @@ class TiShiNengSdkPublic:
             headers['Authorization'] = 'Bearer ' + self.token
             resp = await self.httpClient.post(url=url, data=data, headers=headers)
             if resp.status_code == 200:
-                resp = resp.json()
+                resp = self.jsonOrRaise(resp)
                 if resp['code'] == 0:
                     if 'addExerciseRecord' in url:
                         if 'exerciseRecordId' in resp:
@@ -196,7 +205,7 @@ class TiShiNengSdkPublic:
                     return resp['data']
                 raise TiShiNengError(resp['msg'])
             else:
-                resp = resp.json()
+                resp = self.jsonOrRaise(resp)
                 logger.error(resp)
                 raise TiShiNengError(resp['msg'], resp['code'])
         except TiShiNengError as e:
@@ -216,13 +225,13 @@ class TiShiNengSdkPublic:
             resp = await self.httpClient.get(url=url, params=params, headers=headers)
             logger.info(f'API响应状态码: {resp.status_code}')
             if resp.status_code == 200:
-                resp_json = resp.json()
+                resp_json = self.jsonOrRaise(resp)
                 logger.info(f'API响应内容: {resp_json}')
                 if resp_json['code'] == 0:
                     return resp_json['data']
                 raise TiShiNengError(resp_json['msg'])
             else:
-                resp_json = resp.json()
+                resp_json = self.jsonOrRaise(resp)
                 logger.error(resp_json)
                 raise TiShiNengError(resp_json['msg'], resp_json['code'])
         except TiShiNengError as e:
@@ -401,15 +410,18 @@ class TiShiNengSdkPublic:
         headers['sign'] = sign
         headers['timestamp'] = timestamp
         headers['Authorization'] = 'Bearer ' + self.token
-        file = {'key': (None, key.encode(), 'multipart/form-data; charset=utf-8'), 'param': (None, param.encode(), 'multipart/form-data; charset=utf-8'), 'file': ('file.jpg', io.BytesIO(faceBytes), 'image/png')}
-        resp = await self.httpClient.post(url=url, files=file, headers=headers, timeout=30)
+        file = {'file': ('file.jpg', io.BytesIO(faceBytes), 'image/jpeg')}
+        # key/param 必须以普通表单字段（不带每段 Content-Type）上传，
+        # 否则宝塔 WAF 会以 "from-data 请求异常" 拦截较长的加密参数。
+        form = {'key': key, 'param': param}
+        resp = await self.httpClient.post(url=url, data=form, files=file, headers=headers, timeout=30)
         if resp.status_code == 200:
-            resp = resp.json()
+            resp = self.jsonOrRaise(resp)
             logger.debug(resp)
             if resp['code'] == 0:
                 return resp['data']
             raise TiShiNengError(resp['msg'])
         else:
-            resp = resp.json()
+            resp = self.jsonOrRaise(resp)
             logger.error(resp)
             raise TiShiNengError(resp['msg'], resp['code'])
